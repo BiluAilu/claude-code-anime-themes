@@ -1,0 +1,18 @@
+[
+ ["yatoIdle","yato-idle",60,1.0,{"k":0.45}],
+ ["yatoSword","yato-sword",60,1.0,{"k":0.45}],
+ ["yatoDash","yato-dash",60,1.0,{"k":0.45}],
+ ["yatoSit","yato-sit",60,1.0,{"k":0.45}],
+ ["phantomSmall","phantom-1",300,3,110],
+ ["phantomTall","phantom-2",120,1.5,380],
+ ["torii","torii",60,1.0,560],
+ ["shrine","shrine",80,1.2,300],
+ ["lantern","lantern",80,1.2,380],
+ ["rooftops","rooftops",200,3,1700],
+ ["heavenGate","heaven-gate",60,1.2,520],
+ ["cloudRing","cloud-ring",200,3,560],
+ ["moon","noragami-moon",40,1.0,260],
+ ["wisp1","wisp-1",60,1.2,300],
+ ["wisp2","wisp-2",60,1.2,300],
+ ["coin","coin",300,3,70]
+]

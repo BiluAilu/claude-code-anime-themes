@@ -13,6 +13,16 @@
       "name": "solo-leveling-shadow-monarch",
       "source": "./plugins/solo-leveling-shadow-monarch",
       "description": "Solo Leveling - Shadow Monarch: three worlds (System, Monarch, Dungeon), a shadow-knight companion with a pose per state, and a shadow army that grows with real tool calls."
+    },
+    {
+      "name": "noragami",
+      "source": "./plugins/noragami",
+      "description": "Noragami: three worlds (Shrine Night, Far Shore, Takamagahara) and four playable main characters (Yato, Hiyori, Yukine, Bishamon), each with a pose per session state, signature effects, and the others joining you when subagents start."
+    },
+    {
+      "name": "hunter-x-hunter",
+      "source": "./plugins/hunter-x-hunter",
+      "description": "Hunter x Hunter: three worlds (Godspeed, Heavens Arena, Zoldyck Estate) and four playable main characters (Killua, Gon, Kurapika, Leorio), each with a pose per session state, signature effects, and the others joining you when subagents start."
     }
   ],
   "metadata": {

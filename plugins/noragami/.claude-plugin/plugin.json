@@ -1,0 +1,10 @@
+{
+  "name": "noragami",
+  "version": "0.1.0",
+  "description": "NORAGAMI - Yato: three worlds (Shrine Night, Far Shore, Takamagahara), a stray-god companion with a pose for each session state, phantoms that gather when tools fail, and offerings that count real tool calls.",
+  "author": {
+    "name": "BiluAilu"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

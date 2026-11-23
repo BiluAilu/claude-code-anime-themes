@@ -1,0 +1,18 @@
+[
+ ["killuaIdle","killua-idle",60,1.0,{"k":0.45}],
+ ["killuaClaws","killua-claws",60,1.0,{"k":0.45}],
+ ["killuaSit","killua-sit",60,1.0,{"k":0.45}],
+ ["killuaDash","Anime_character_in_mid-air_lunge",60,1.0,{"k":0.45}],
+ ["yoyo","yoyo",120,2,120],
+ ["skateboard","skateboard",100,2,190],
+ ["estateGate","estate-gate",120,1.5,620],
+ ["mountain","mountain",120,2,1700],
+ ["arenaTower","arena-tower",100,1.5,800],
+ ["cityRoofs","city-roofs",120,2,1700],
+ ["crowd","crowd",120,2,360],
+ ["lightning1","lightning-1",60,1.2,560],
+ ["lightning2","lightning-2",60,1.2,560],
+ ["lightning3","lightning-3",60,1.2,560],
+ ["moon","hxh-moon",40,1.0,260],
+ ["aura","aura",100,2,300]
+]

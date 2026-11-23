@@ -1,0 +1,10 @@
+{
+  "name": "hunter-x-hunter",
+  "version": "0.1.0",
+  "description": "HUNTER x HUNTER - Killua: three worlds (Godspeed, Heavens Arena, Zoldyck Estate), a Killua companion with a pose for each session state, Godspeed afterimages for subagents, and a lightning charge that counts real tool calls.",
+  "author": {
+    "name": "BiluAilu"
+  },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
