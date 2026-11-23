@@ -1,0 +1,10 @@
+{
+  "name": "yato-killua-godspeed",
+  "version": "0.1.0",
+  "description": "YATO x KILLUA - Godspeed Divine Edition: a midnight shrine-blue and lightning-cyan look with an animated backdrop that follows real session activity. /godspeed switches Divine, Godspeed and Dual modes.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "bilkes"
+  },
+  "license": "MIT"
+}

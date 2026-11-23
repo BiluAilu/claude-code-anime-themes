@@ -1,0 +1,16 @@
+{
+  "name": "claude-code-anime-themes",
+  "owner": {
+    "name": "BiluAilu"
+  },
+  "plugins": [
+    {
+      "name": "yato-killua-godspeed",
+      "source": "./plugins/yato-killua-godspeed",
+      "description": "Yato x Killua - Godspeed Divine Edition: midnight shrine-blue meets Godspeed lightning, with an animated backdrop that follows real session activity."
+    }
+  ],
+  "metadata": {
+    "description": "Original anime-inspired looks for the Claude desktop app, one plugin per theme."
+  }
+}
