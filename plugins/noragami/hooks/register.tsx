@@ -1,12 +1,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, ThemeSetArgs } from 'claude-code'
 
-import type { Counts, Mode, Phase, ToolKind, Who } from '../types'
+import type { Counts, Mode, Phase, Scheme, ToolKind, Who } from '../types'
 import { CAST, ROSTER, partyOf } from './cast.js'
 import { kindOf } from './kinds.js'
 import { colorsFor, glassFor, styleFor } from './palette.js'
 import { buildScene } from './scene.js'
-import { TONE, tintTone } from './worlds.js'
 
 // Everything here is driven by real events: turn.start, turn.step chunks, tool.call
 // (with the real tool name), turn.complete (with its real duration), the classic
@@ -22,6 +21,8 @@ const ZERO: Counts = { turns: 0, tools: 0, failures: 0, steps: 0, agents: 0, per
 const phase = atom({ plugin: 'noragami', key: 'phase' } as const, 'idle')
 const mode = atom({ plugin: 'noragami', key: 'mode' } as const, DEFAULT_MODE)
 const who = atom({ plugin: 'noragami', key: 'who' } as const, DEFAULT_WHO)
+// auto follows the app's own light or dark mode; light and dark force one.
+const scheme = atom({ plugin: 'noragami', key: 'scheme' } as const, 'auto')
 const pct = atom({ plugin: 'noragami', key: 'pct' } as const, 0)
 // Change the tag when Counts changes: it declines what an earlier version stored.
 const counts = atom({ plugin: 'noragami', key: 'counts' } as const, ZERO, { shape: 'counts-2' })
@@ -118,7 +119,7 @@ async function refreshContext($: EngineInterface) {
   return value
 }
 
-async function applyLook($: EngineInterface, which: Mode, accent: string) {
+async function applyLook($: EngineInterface, which: Mode, accent: string, schemeNow: Scheme) {
   const { theme, problems } = colorsFor(which, accent)
   const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
 
@@ -127,7 +128,7 @@ async function applyLook($: EngineInterface, which: Mode, accent: string) {
   }
   const look: ThemeSetArgs = {
     colors: theme,
-    overrideColorScheme: 'dark',
+    ...(schemeNow === 'auto' ? {} : { overrideColorScheme: schemeNow }),
     backdrop: { scene: `noragami-${which}`, glass: glassFor(which, accent) },
   }
 
@@ -166,14 +167,17 @@ export const register: Register = on => {
     const savedWho = await $.store.get('ng-who')
     const startWho: Who = isWho(savedWho) ? savedWho : DEFAULT_WHO
     await update($, who, () => startWho)
+    const savedScheme = await $.store.get('ng-scheme')
+    const startScheme: Scheme = savedScheme === 'light' || savedScheme === 'dark' ? savedScheme : 'auto'
+    await update($, scheme, () => startScheme)
     await $.command.register({
       name: 'noragami',
-      description: 'Noragami: /noragami shrine | farshore | heaven | yato | hiyori | yukine | bishamon | status | off | on',
+      description: 'Noragami: /noragami shrine | farshore | heaven | yato | hiyori | yukine | bishamon | light | dark | auto | status | off | on',
     })
     const isOff = (await $.store.get('ng-off')) === true
     await update($, off, () => isOff)
     // A build with no theme support must not stop the band and the counters.
-    await (isOff ? Promise.resolve() : applyLook($, which, CAST[startWho].accent)).catch(error => $.ui.log(`noragami: no theme: ${String(error)}`))
+    await (isOff ? Promise.resolve() : applyLook($, which, CAST[startWho].accent, startScheme)).catch(error => $.ui.log(`noragami: no theme: ${String(error)}`))
     await refreshContext($).catch(() => undefined)
 
     return next(e)
@@ -187,7 +191,7 @@ export const register: Register = on => {
     const me = await read($, who)
 
     if (want === '') {
-      return { text: `World: ${now}. Character: ${me}. Use /noragami followed by a world (${MODES.join(', ')}), a character (${ROSTER.join(', ')}), status, off or on.` }
+      return { text: `World: ${now}. Character: ${me}. Use /noragami followed by a world (${MODES.join(', ')}), a character (${ROSTER.join(', ')}), light, dark, auto, status, off or on.` }
     }
 
     if (want === 'off') {
@@ -207,7 +211,7 @@ export const register: Register = on => {
       await $.store.set('ng-off', false)
       await update($, off, () => false)
       let note = ''
-      await applyLook($, await read($, mode), CAST[me].accent).catch(() => {
+      await applyLook($, await read($, mode), CAST[me].accent, await read($, scheme)).catch(() => {
         note = ' (this build draws no themes)'
       })
 
@@ -221,7 +225,23 @@ export const register: Register = on => {
       const r = await read($, running)
 
       return {
-        text: `Real events seen this session: turns ${c.turns}, model steps ${c.steps}, tool calls ${c.tools}, tool failures ${c.failures}, subagents started ${c.agents} (${r} running), permission prompts ${c.permissions}, denials ${c.denials}, compactions ${c.compactions}. State: ${p}. Context: ${percent}%. World: ${now}. Character: ${me}.`,
+        text: `Real events seen this session: turns ${c.turns}, model steps ${c.steps}, tool calls ${c.tools}, tool failures ${c.failures}, subagents started ${c.agents} (${r} running), permission prompts ${c.permissions}, denials ${c.denials}, compactions ${c.compactions}. State: ${p}. Context: ${percent}%. World: ${now}. Character: ${me}. Appearance: ${await read($, scheme)}.`,
+      }
+    }
+
+    if (want === 'light' || want === 'dark' || want === 'auto') {
+      await $.store.set('ng-scheme', want)
+      await update($, scheme, () => want)
+      let note = ''
+
+      if (!(await read($, off))) {
+        await applyLook($, now, CAST[me].accent, want).catch(() => {
+          note = ' (this build draws no themes)'
+        })
+      }
+
+      return {
+        text: want === 'auto' ? `Follows the app: the day look when the app is light, the night look when it is dark.${note}` : `Forced to the ${want} look.${note}`,
       }
     }
 
@@ -232,7 +252,7 @@ export const register: Register = on => {
 
       // The character sets the whole look, so the theme is applied again in their color.
       if (!(await read($, off))) {
-        await applyLook($, now, CAST[want].accent).catch(() => {
+        await applyLook($, now, CAST[want].accent, await read($, scheme)).catch(() => {
           note = ' (this build draws no themes, so only the companion changed)'
         })
       }
@@ -248,7 +268,7 @@ export const register: Register = on => {
     await update($, off, () => false)
     await update($, mode, () => want)
     let note = ''
-    await applyLook($, want, CAST[me].accent).catch(() => {
+    await applyLook($, want, CAST[me].accent, await read($, scheme)).catch(() => {
       note = ' (this build draws no themes, so only the band changed)'
     })
 
@@ -296,22 +316,22 @@ export const register: Register = on => {
     const r = await read($, running)
     const k = await read($, tool)
     const accent = CAST[w].accent
-    const tone = tintTone(TONE[m], accent)
     const warn = percent >= 80
-    const stateColor = p === 'error' ? '#FF4D63' : p === 'waiting' ? '#FFB02E' : p === 'done' ? tone.eye : tone.glow2
+    // Theme keys follow the app's own light or dark, so the band reads in both.
+    const stateColor = p === 'error' ? 'error' : p === 'waiting' ? 'warning' : p === 'done' ? 'success' : 'suggestion'
     const state = p === 'tools' ? `${LABEL[p]} · ${TOOL_LABEL[k]}` : LABEL[p]
 
     return (
       <Box>
-        <Text color={tone.glow}>◆ </Text>
-        <Text color={tone.glow2} bold>{TITLE[m]}</Text>
-        <Text color={tone.glow}> ◆ </Text>
-        <Text color={accent} bold>{CAST[w].name}</Text>
-        <Text color="#8FA0B8"> · </Text>
+        <Text color={accent}>◆ </Text>
+        <Text bold>{TITLE[m]}</Text>
+        <Text color={accent}> ◆ </Text>
+        <Text bold>{CAST[w].name}</Text>
+        <Text color="inactive"> · </Text>
         <Text color={stateColor}>{state}</Text>
-        <Text color="#8FA0B8"> │ turns {c.turns} · tools {c.tools}{c.failures > 0 ? ` · fails ${c.failures}` : ''}{r > 0 ? ` · party ${r}` : ''}</Text>
-        <Text color="#8FA0B8"> │ </Text>
-        <Text color={warn ? '#FFB02E' : tone.glow2}>{meter(percent)} {percent}%</Text>
+        <Text color="inactive"> │ turns {c.turns} · tools {c.tools}{c.failures > 0 ? ` · fails ${c.failures}` : ''}{r > 0 ? ` · party ${r}` : ''}</Text>
+        <Text color="inactive"> │ </Text>
+        <Text color={warn ? 'warning' : 'suggestion'}>{meter(percent)} {percent}%</Text>
       </Box>
     )
   })

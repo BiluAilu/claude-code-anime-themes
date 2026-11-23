@@ -18,3 +18,9 @@ export function mix(base: string, toward: string, t: number): Hex {
 
   return `#${two(a[0] + (b[0] - a[0]) * t)}${two(a[1] + (b[1] - a[1]) * t)}${two(a[2] + (b[2] - a[2]) * t)}`
 }
+
+// A CSS color that is one value in light mode and another in dark mode; the scene's own
+// color-scheme follows the app's.
+export function ld(light: string, dark: string) {
+  return `light-dark(${light}, ${dark})`
+}
