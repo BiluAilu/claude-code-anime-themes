@@ -18,9 +18,10 @@ declare module 'claude-code' {
       phase: Phase
       mode: Mode
       pct: number
-      counts: Counts
+      counts: Shaped<Counts>
       tool: ToolKind
       running: number
+      off: boolean
     }
   }
 }

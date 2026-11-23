@@ -20,8 +20,10 @@ const ZERO: Counts = { turns: 0, tools: 0, failures: 0, steps: 0, agents: 0, per
 const phase = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'phase' } as const, 'idle')
 const mode = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'mode' } as const, DEFAULT_MODE)
 const pct = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'pct' } as const, 0)
-const counts = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'counts' } as const, ZERO)
+// Change the tag when Counts changes: it declines what an earlier version stored.
+const counts = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'counts' } as const, ZERO, { shape: 'counts-2' })
 const tool = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'tool' } as const, 'shell')
+const off = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'off' } as const, false)
 const running = atom({ plugin: 'solo-leveling-shadow-monarch', key: 'running' } as const, 0)
 
 const LABEL: Record<Phase, string> = {
@@ -57,8 +59,21 @@ function isMode(value: unknown): value is Mode {
 // The module's own variables restart on reload; the atoms above do not.
 let current: Phase = 'idle'
 let warned = 0
+// The plugin whose backdrop was last drawn: the theme actually on screen. The render hook
+// below notes it; no state is written while drawing.
+let owner: string | undefined
 let before = 0
 let calmTimer: { cancel: () => void } | undefined
+
+function isActive($: EngineInterface) {
+  return owner === undefined || owner === $.plugin.name
+}
+
+async function say($: EngineInterface, text: string) {
+  if (isActive($) && !(await read($, off))) {
+    $.ui.toast(text)
+  }
+}
 
 async function setPhase($: EngineInterface, next: Phase) {
   if (next === current) {
@@ -89,7 +104,7 @@ async function refreshContext($: EngineInterface) {
   const band = value >= 90 ? 90 : value >= 80 ? 80 : 0
 
   if (band > warned) {
-    $.ui.toast(`Warning: context ${value}% full. Consider /compact.`)
+    await say($, `Warning: context ${value}% full. Consider /compact.`)
   }
   warned = band
 
@@ -101,7 +116,7 @@ async function applyLook($: EngineInterface, which: Mode) {
   const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
 
   if (unpainted !== undefined) {
-    $.ui.toast(unpainted)
+    await say($, unpainted)
   }
   const look: ThemeSetArgs = {
     colors: theme,
@@ -118,7 +133,7 @@ async function applyLook($: EngineInterface, which: Mode) {
 }
 
 async function bump($: EngineInterface, key: keyof Counts) {
-  await update($, counts, c => ({ ...c, [key]: c[key] + 1 }))
+  await update($, counts, c => ({ ...ZERO, ...c, [key]: (c[key] ?? 0) + 1 }))
 }
 
 async function setTool($: EngineInterface, name: string) {
@@ -143,10 +158,12 @@ export const register: Register = on => {
     await update($, mode, () => which)
     await $.command.register({
       name: 'shadow',
-      description: 'Shadow Monarch: /shadow system | monarch | dungeon | status',
+      description: 'Shadow Monarch: /shadow system | monarch | dungeon | status | off | on',
     })
+    const isOff = (await $.store.get('sl-off')) === true
+    await update($, off, () => isOff)
     // A build with no theme support must not stop the band and the counters.
-    await applyLook($, which).catch(error => $.ui.log(`solo-leveling-shadow-monarch: no theme: ${String(error)}`))
+    await (isOff ? Promise.resolve() : applyLook($, which)).catch(error => $.ui.log(`solo-leveling-shadow-monarch: no theme: ${String(error)}`))
     await refreshContext($).catch(() => undefined)
 
     return next(e)
@@ -157,11 +174,35 @@ export const register: Register = on => {
     const now = await read($, mode)
 
     if (want === '') {
-      return { text: `World: ${now}. Use /shadow system, monarch, dungeon or status.` }
+      return { text: `World: ${now}. Use /shadow system, monarch, dungeon, status, off or on.` }
+    }
+
+    if (want === 'off') {
+      await $.store.set('sl-off', true)
+      await update($, off, () => true)
+      let note = ''
+      try {
+        await $.theme.clear()
+      } catch {
+        note = ' (this build could not clear the theme)'
+      }
+
+      return { text: `Theme off: the app's own look is back${note}. Use /shadow on to bring it back.` }
+    }
+
+    if (want === 'on') {
+      await $.store.set('sl-off', false)
+      await update($, off, () => false)
+      let note = ''
+      await applyLook($, await read($, mode)).catch(() => {
+        note = ' (this build draws no themes)'
+      })
+
+      return { text: `Theme on.${note}` }
     }
 
     if (want === 'status') {
-      const c = await read($, counts)
+      const c = { ...ZERO, ...(await read($, counts)) }
       const p = await read($, phase)
       const percent = await read($, pct)
       const r = await read($, running)
@@ -175,6 +216,8 @@ export const register: Register = on => {
       return { text: `Unknown world "${want}". Use system, monarch or dungeon.` }
     }
     await $.store.set('sl-mode', want)
+    await $.store.set('sl-off', false)
+    await update($, off, () => false)
     await update($, mode, () => want)
     let note = ''
     await applyLook($, want).catch(() => {
@@ -190,7 +233,9 @@ export const register: Register = on => {
       return next(e)
     }
 
-    if (e.props.plugin !== $.plugin.name) {
+    owner = e.props.plugin
+
+    if (e.props.plugin !== $.plugin.name || (await read($, off))) {
       return next(e)
     }
     const { Svg } = $.ui.resolve(e)
@@ -209,7 +254,7 @@ export const register: Register = on => {
 
   // The status band: title, state, real counts and the real context meter.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) {
+    if (e.props.hasSurvey || (await read($, off)) || !isActive($)) {
       return next(e)
     }
     const { Box, Text } = $.ui.resolve(e)
@@ -275,7 +320,7 @@ export const register: Register = on => {
     if (ran.deny === undefined && ran.isError === true) {
       await bump($, 'failures')
       await setPhase($, 'error')
-      $.ui.toast(`Penalty: ${e.tool} failed`)
+      await say($, `Penalty: ${e.tool} failed`)
     }
     await refreshContext($).catch(() => undefined)
 
@@ -303,7 +348,7 @@ export const register: Register = on => {
     await bump($, 'permissions')
     await setTool($, e.tool_name)
     await setPhase($, 'waiting')
-    $.ui.toast(`Awaiting your approval: ${e.tool_name}`)
+    await say($, `Awaiting your approval: ${e.tool_name}`)
 
     return next(e)
   })
@@ -318,7 +363,7 @@ export const register: Register = on => {
   on('classic.SubagentStart', async ($, e, next) => {
     await bump($, 'agents')
     await update($, running, n => n + 1)
-    $.ui.toast(`A shadow arises: ${e.agent_type}`)
+    await say($, `A shadow arises: ${e.agent_type}`)
 
     return next(e)
   })
@@ -341,7 +386,7 @@ export const register: Register = on => {
     const after = await refreshContext($).catch(() => 0)
     warned = after >= 90 ? 90 : after >= 80 ? 80 : 0
     await setPhase($, 'idle')
-    $.ui.toast(`Context compacted: ${before}% → ${after}%`)
+    await say($, `Context compacted: ${before}% → ${after}%`)
 
     return next(e)
   })
@@ -353,7 +398,7 @@ export const register: Register = on => {
       await setPhase($, e.reason === 'error' ? 'error' : e.isAborted ? 'idle' : 'done')
 
       if (e.reason !== 'error' && !e.isAborted && e.durationMs >= 15000) {
-        $.ui.toast(`Quest cleared in ${Math.round(e.durationMs / 1000)}s`)
+        await say($, `Quest cleared in ${Math.round(e.durationMs / 1000)}s`)
       }
     }
 

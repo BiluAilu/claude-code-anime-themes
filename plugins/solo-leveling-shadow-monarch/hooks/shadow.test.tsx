@@ -83,9 +83,14 @@ async function bandWords($: any) {
 }
 
 const usage = { pct: 10 }
+const toasted: string[] = []
 
 function engine(on: any) {
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', (_: unknown, e: { text?: string }) => {
+    toasted.push(String(e.text))
+
+    return { value: undefined }
+  })
   on('ui.log', () => ({ value: undefined }))
   on('session.start', (_: unknown, e: { cwd: string }) => ({ cwd: e.cwd }))
   on('store.get', () => ({ value: undefined }))
@@ -212,4 +217,54 @@ test('each tool kind gets its own effect label from the real tool name', async (
     await $.tool.call({ tool, ...extra })
     expect(await bandWords($)).toContain(label)
   }
+})
+
+test('/shadow off hides the band and the backdrop, /shadow on brings them back', async ($, on) => {
+  classicEngine(on)
+  // Nothing sits beneath the mod in a test: this stands for the engine's own drawing.
+  on('ui.render', ($2, e) => {
+    const { Text } = $2.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  usage.pct = 10
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(await bandWords($)).toContain('SHADOW MONARCH')
+  const off = await $.command.run({ command: 'shadow', args: 'off' })
+  expect(JSON.stringify(off)).toContain('Theme off')
+  const ui = await $.ui.mount(BAND('desktop'))
+  expect(await ui.find({ type: 'Text', text: /SHADOW MONARCH/ })).toBeUndefined()
+  await ui.unmount()
+  const back = await $.command.run({ command: 'shadow', args: 'on' })
+  expect(JSON.stringify(back)).toContain('Theme on')
+  expect(await bandWords($)).toContain('SHADOW MONARCH')
+})
+
+test('the band and toasts stay quiet while the other mod owns the theme', async ($, on) => {
+  classicEngine(on)
+  on('ui.render', ($2, e) => {
+    const { Text } = $2.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  toasted.length = 0
+  usage.pct = 10
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(await bandWords($)).toContain('SHADOW MONARCH')
+
+  // The other mod's backdrop is the one drawn: this mod notes it and steps aside.
+  let ui = await $.ui.mount({ ...BACKDROP('desktop', 'godspeed-dual'), props: { scene: 'godspeed-dual', plugin: 'yato-killua-godspeed', glass: false as const } })
+  await ui.unmount()
+  ui = await $.ui.mount(BAND('desktop'))
+  expect(await ui.find({ type: 'Text', text: /SHADOW MONARCH/ })).toBeUndefined()
+  await ui.unmount()
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
+  expect(toasted.join('|')).not.toContain('Awaiting your approval')
+
+  // Its own backdrop is drawn again: band and toasts return.
+  ui = await $.ui.mount(BACKDROP('desktop', 'shadow-monarch'))
+  await ui.unmount()
+  expect(await bandWords($)).toContain('SHADOW MONARCH')
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} })
+  expect(toasted.join('|')).toContain('Awaiting your approval')
 })

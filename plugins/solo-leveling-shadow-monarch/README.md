@@ -32,6 +32,7 @@ Counts, the context percentage and the turn length shown in toasts come from the
 
 ## Commands
 - `/shadow` shows the current world. `/shadow system|monarch|dungeon` switches (remembered across sessions).
+- `/shadow off` clears the theme and hides the band, restoring the app's own look (it stays off in new chats). `/shadow on` brings it back, and choosing a world also turns it on.
 - `/shadow status` prints the real event counts this session received (turns, steps, tools, failures, subagents, permission prompts, denials, compactions). Use it to confirm the integrations work live.
 
 ## Install and rollback
@@ -49,3 +50,4 @@ Not supported or not done:
 - A permission wait ends when the tool finishes (the classic PostToolUse event), so a long approved tool still shows the wait until it is done; there is no separate event for the moment of approval.
 - Subagent counts come from the SubagentStart and SubagentStop events; if the engine does not fire them in some mode, the soldiers will not appear.
 - Tests exercise the hooks against the documented event shapes; whether your app version draws mod backdrops can only be confirmed by looking.
+

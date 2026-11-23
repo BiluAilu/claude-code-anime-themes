@@ -14,6 +14,6 @@ export type Counts = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'yato-killua-godspeed': { phase: Phase; mode: Mode; pct: number; counts: Counts; tool: ToolKind; running: number }
+    'yato-killua-godspeed': { phase: Phase; mode: Mode; pct: number; counts: Shaped<Counts>; tool: ToolKind; running: number; off: boolean }
   }
 }

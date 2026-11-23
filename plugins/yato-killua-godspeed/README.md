@@ -7,6 +7,7 @@ A midnight-blue anime look for the Claude desktop app, mixing Yato's calm shrine
 - **Permission prompt:** an amber ring and glow around the moon and "awaiting your word"; it ends when the tool finishes.
 - **Compaction:** rings contract inward and the sky darkens; a toast shows the real before and after context percentage.
 - **Tool kind (from the real tool name):** Edit/Write a slash, Read/Grep/Glob sonar rings, WebFetch/WebSearch a beam into the moon, Agent/Task summon rings, MCP cyan lightning, Bash the Godspeed dash.
+- `/godspeed off` clears the theme and hides the band, restoring the app's own look (it stays off in new chats). `/godspeed on` brings it back, and choosing a mode also turns it on.
 - `/godspeed status` prints the real event counts this session received.
 
 ## Use
@@ -18,3 +19,6 @@ A midnight-blue anime look for the Claude desktop app, mixing Yato's calm shrine
 - Only the desktop and mobile apps draw themes and backdrops; the terminal gets the band only.
 - A session has one theme at a time, so this replaces `theme-examples` while active. That plugin is untouched.
 - Rollback: delete this folder, or run `$.theme.clear()` via the other plugin's `/custom-theme off`.
+
+## With more than one theme installed
+Only one theme draws at a time. Each theme mod notes which backdrop was drawn last and hides its own status band and toasts while another theme is the one on screen. The band updates at the next turn or tool event after you switch, and in the terminal (which draws no backdrop) every installed theme's band shows.

@@ -83,3 +83,45 @@ test('each tool kind gets its own effect label from the real tool name', async (
     expect(await words($)).toContain(label)
   }
 })
+
+test('/godspeed off hides the band, /godspeed on brings it back', async ($, on) => {
+  engine(on)
+  // Nothing sits beneath the mod in a test: this stands for the engine's own drawing.
+  on('ui.render', ($2, e) => {
+    const { Text } = $2.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  usage.pct = 10
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(await words($)).toContain('calm')
+  const off = await $.command.run({ command: 'godspeed', args: 'off' })
+  expect(JSON.stringify(off)).toContain('Theme off')
+  const ui = await $.ui.mount(BAND)
+  expect(await ui.find({ type: 'Text', text: /calm/ })).toBeUndefined()
+  await ui.unmount()
+  const back = await $.command.run({ command: 'godspeed', args: 'on' })
+  expect(JSON.stringify(back)).toContain('Theme on')
+  expect(await words($)).toContain('calm')
+})
+
+test('the band stays quiet while the other mod owns the theme', async ($, on) => {
+  engine(on)
+  on('ui.render', ($2, e) => {
+    const { Text } = $2.ui.resolve(e)
+
+    return <Text>engine</Text>
+  })
+  usage.pct = 10
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  expect(await words($)).toContain('calm')
+  const base = { plugin: 'yato-killua-godspeed', surface: 'desktop' as const, component: 'Backdrop' as const }
+  let ui = await $.ui.mount({ ...base, props: { scene: 'shadow-monarch', plugin: 'solo-leveling-shadow-monarch', glass: false } })
+  await ui.unmount()
+  ui = await $.ui.mount(BAND)
+  expect(await ui.find({ type: 'Text', text: /calm/ })).toBeUndefined()
+  await ui.unmount()
+  ui = await $.ui.mount({ ...base, props: { scene: 'godspeed-dual', plugin: 'yato-killua-godspeed', glass: false } })
+  await ui.unmount()
+  expect(await words($)).toContain('calm')
+})

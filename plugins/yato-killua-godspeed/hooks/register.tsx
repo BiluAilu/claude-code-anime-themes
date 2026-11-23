@@ -13,8 +13,11 @@ const DEFAULT_MODE: Mode = 'dual'
 const phase = atom({ plugin: 'yato-killua-godspeed', key: 'phase' } as const, 'idle')
 const mode = atom({ plugin: 'yato-killua-godspeed', key: 'mode' } as const, DEFAULT_MODE)
 const pct = atom({ plugin: 'yato-killua-godspeed', key: 'pct' } as const, 0)
-const counts = atom({ plugin: 'yato-killua-godspeed', key: 'counts' } as const, { turns: 0, tools: 0, failures: 0, steps: 0, agents: 0, permissions: 0, denials: 0, compactions: 0 })
+const ZERO: Counts = { turns: 0, tools: 0, failures: 0, steps: 0, agents: 0, permissions: 0, denials: 0, compactions: 0 }
+// Change the tag when Counts changes: it declines what an earlier version stored.
+const counts = atom({ plugin: 'yato-killua-godspeed', key: 'counts' } as const, ZERO, { shape: 'counts-2' })
 const tool = atom({ plugin: 'yato-killua-godspeed', key: 'tool' } as const, 'shell')
+const off = atom({ plugin: 'yato-killua-godspeed', key: 'off' } as const, false)
 const running = atom({ plugin: 'yato-killua-godspeed', key: 'running' } as const, 0)
 
 const LABEL: Record<Phase, string> = {
@@ -46,8 +49,21 @@ import type { EngineInterface } from 'claude-code'
 // The module's own variables restart on reload; the atoms above do not.
 let current: Phase = 'idle'
 let warned = 0
+// The plugin whose backdrop was last drawn: the theme actually on screen. The render hook
+// below notes it; no state is written while drawing.
+let owner: string | undefined
 let before = 0
 let calmTimer: { cancel: () => void } | undefined
+
+function isActive($: EngineInterface) {
+  return owner === undefined || owner === $.plugin.name
+}
+
+async function say($: EngineInterface, text: string) {
+  if (isActive($) && !(await read($, off))) {
+    $.ui.toast(text)
+  }
+}
 
 async function setPhase($: EngineInterface, next: Phase) {
   if (next === current) {
@@ -80,7 +96,7 @@ async function refreshContext($: EngineInterface) {
   const band = value >= 90 ? 90 : value >= 80 ? 80 : 0
 
   if (band > warned) {
-    $.ui.toast(`Context ${value}% full - consider /compact`)
+    await say($, `Context ${value}% full - consider /compact`)
   }
   warned = band
 
@@ -88,7 +104,7 @@ async function refreshContext($: EngineInterface) {
 }
 
 async function bump($: EngineInterface, key: keyof Counts) {
-  await update($, counts, c => ({ ...c, [key]: c[key] + 1 }))
+  await update($, counts, c => ({ ...ZERO, ...c, [key]: (c[key] ?? 0) + 1 }))
 }
 
 async function setTool($: EngineInterface, name: string) {
@@ -100,7 +116,7 @@ async function applyLook($: EngineInterface, which: Mode) {
   const unpainted = problems.find(line => line.startsWith("Desktop won't paint"))
 
   if (unpainted !== undefined) {
-    $.ui.toast(unpainted)
+    await say($, unpainted)
   }
   const look: ThemeSetArgs = {
     colors: theme,
@@ -123,9 +139,11 @@ export const register: Register = on => {
     await update($, mode, () => which)
     await $.command.register({
       name: 'godspeed',
-      description: 'Switch look: /godspeed divine | godspeed | dual (default dual)',
+      description: 'Switch look: /godspeed divine | godspeed | dual | status | off | on (default dual)',
     })
-    await applyLook($, which)
+    const isOff = (await $.store.get('off')) === true
+    await update($, off, () => isOff)
+    await (isOff ? Promise.resolve() : applyLook($, which))
     await refreshContext($).catch(() => undefined)
 
     return next(e)
@@ -137,11 +155,35 @@ export const register: Register = on => {
     if (want === '') {
       const now = await read($, mode)
 
-      return { text: `Mode: ${now}. Use /godspeed divine, godspeed, dual or status.` }
+      return { text: `Mode: ${now}. Use /godspeed divine, godspeed, dual, status, off or on.` }
+    }
+
+    if (want === 'off') {
+      await $.store.set('off', true)
+      await update($, off, () => true)
+      let note = ''
+      try {
+        await $.theme.clear()
+      } catch {
+        note = ' (this build could not clear the theme)'
+      }
+
+      return { text: `Theme off: the app's own look is back${note}. Use /godspeed on to bring it back.` }
+    }
+
+    if (want === 'on') {
+      await $.store.set('off', false)
+      await update($, off, () => false)
+      let note = ''
+      await applyLook($, await read($, mode)).catch(() => {
+        note = ' (this build draws no themes)'
+      })
+
+      return { text: `Theme on.${note}` }
     }
 
     if (want === 'status') {
-      const c = await read($, counts)
+      const c = { ...ZERO, ...(await read($, counts)) }
       const r = await read($, running)
 
       return {
@@ -153,6 +195,8 @@ export const register: Register = on => {
       return { text: `Unknown mode "${want}". Use divine, godspeed or dual.` }
     }
     await $.store.set('mode', want)
+    await $.store.set('off', false)
+    await update($, off, () => false)
     await update($, mode, () => want)
     await applyLook($, want)
 
@@ -164,7 +208,9 @@ export const register: Register = on => {
     if (e.surface !== 'desktop' && e.surface !== 'mobile') {
       return next(e)
     }
-    if (e.props.plugin !== $.plugin.name) {
+    owner = e.props.plugin
+
+    if (e.props.plugin !== $.plugin.name || (await read($, off))) {
       return next(e)
     }
     const { Svg } = $.ui.resolve(e)
@@ -181,7 +227,7 @@ export const register: Register = on => {
 
   // A slim band: shrine gate, a divider, lightning, then real figures only.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (e.props.hasSurvey) {
+    if (e.props.hasSurvey || (await read($, off)) || !isActive($)) {
       return next(e)
     }
     const { Box, Text } = $.ui.resolve(e)
@@ -242,7 +288,9 @@ export const register: Register = on => {
     if (ran.deny === undefined && ran.isError === true) {
       await bump($, 'failures')
       await setPhase($, 'error')
-      $.ui.status(`⚡ ${e.tool} failed`)
+      if (isActive($)) {
+        $.ui.status(`⚡ ${e.tool} failed`)
+      }
     }
     await refreshContext($).catch(() => undefined)
 
@@ -270,7 +318,7 @@ export const register: Register = on => {
     await bump($, 'permissions')
     await setTool($, e.tool_name)
     await setPhase($, 'waiting')
-    $.ui.toast(`Awaiting your approval: ${e.tool_name}`)
+    await say($, `Awaiting your approval: ${e.tool_name}`)
 
     return next(e)
   })
@@ -285,7 +333,7 @@ export const register: Register = on => {
   on('classic.SubagentStart', async ($, e, next) => {
     await bump($, 'agents')
     await update($, running, n => n + 1)
-    $.ui.toast(`A spirit answers the call: ${e.agent_type}`)
+    await say($, `A spirit answers the call: ${e.agent_type}`)
 
     return next(e)
   })
@@ -308,7 +356,7 @@ export const register: Register = on => {
     const after = await refreshContext($).catch(() => 0)
     warned = after >= 90 ? 90 : after >= 80 ? 80 : 0
     await setPhase($, 'idle')
-    $.ui.toast(`Context compacted: ${before}% → ${after}%`)
+    await say($, `Context compacted: ${before}% → ${after}%`)
 
     return next(e)
   })
