@@ -82,6 +82,8 @@ async function bandWords($: any) {
   return words
 }
 
+const usage = { pct: 10 }
+
 function engine(on: any) {
   on('ui.toast', () => ({ value: undefined }))
   on('ui.log', () => ({ value: undefined }))
@@ -90,7 +92,7 @@ function engine(on: any) {
   on('store.set', () => ({ value: undefined }))
   on('command.register', () => ({ value: { command: 'shadow' } }))
   on('clock.after', () => ({ value: { cancel: () => undefined } }))
-  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, tokens: 100, percent: 10 }, rateLimits: [] } }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000, tokens: usage.pct * 10, percent: usage.pct }, rateLimits: [] } }))
   on('turn.start', () => ({ turnId: 't1' }))
 }
 
@@ -144,10 +146,70 @@ for (const world of ['system', 'monarch', 'dungeon'] as const) {
 }
 
 test('status reports the real event counts', async ($, on) => {
+  usage.pct = 10
   engine(on)
   on('tool.call', () => ({ result: {} }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await $.tool.call({ tool: 'Bash', command: 'ls' })
   const out = await $.command.run({ command: 'shadow', args: 'status' })
   expect(JSON.stringify(out)).toContain('tool calls 1')
+})
+
+function classicEngine(on: any) {
+  engine(on)
+  for (const name of ['SubagentStart', 'SubagentStop', 'PermissionRequest', 'PermissionDenied', 'PostToolUse', 'PostToolUseFailure', 'PreCompact', 'PostCompact']) {
+    on(`classic.${name}`, () => ({}))
+  }
+  on('tool.call', () => ({ result: {} }))
+}
+
+test('subagents start and stop: soldiers appear and leave', async ($, on) => {
+  classicEngine(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.classic.SubagentStart({ agent_id: 'a1', agent_type: 'Explore' })
+  await $.classic.SubagentStart({ agent_id: 'a2', agent_type: 'Plan' })
+  expect(await bandWords($)).toContain('soldiers 2')
+  await $.classic.SubagentStop({ agent_id: 'a1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '/x' })
+  expect(await bandWords($)).toContain('soldiers 1')
+  const out = await $.command.run({ command: 'shadow', args: 'status' })
+  expect(JSON.stringify(out)).toContain('subagents started 2 (1 running)')
+})
+
+test('a permission prompt shows the waiting state until the tool finishes', async ($, on) => {
+  classicEngine(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'ls' } })
+  expect(await bandWords($)).toContain('awaiting your word')
+  await $.classic.PostToolUse({ tool_name: 'Bash', tool_input: {}, tool_response: {}, tool_use_id: 'u1' })
+  expect(await bandWords($)).not.toContain('awaiting your word')
+  const out = await $.command.run({ command: 'shadow', args: 'status' })
+  expect(JSON.stringify(out)).toContain('permission prompts 1')
+})
+
+test('compaction shows the purge state, then the real before and after', async ($, on) => {
+  classicEngine(on)
+  usage.pct = 90
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.classic.PreCompact({ trigger: 'manual', custom_instructions: null })
+  expect(await bandWords($)).toContain('purging the shadows')
+  usage.pct = 30
+  await $.classic.PostCompact({ trigger: 'manual', compact_summary: 's' })
+  const words = await bandWords($)
+  expect(words).toContain('30%')
+  expect(words).not.toContain('purging')
+})
+
+test('each tool kind gets its own effect label from the real tool name', async ($, on) => {
+  classicEngine(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+
+  for (const [tool, label, extra] of [
+    ['Edit', 'slash', { file_path: '/x', old_string: 'a', new_string: 'b' }],
+    ['Read', 'scout', { file_path: '/x' }],
+    ['WebFetch', 'gate', { url: 'https://example.com', prompt: 'p' }],
+    ['Bash', 'dash', { command: 'ls' }],
+  ] as const) {
+    await $.tool.call({ tool, ...extra })
+    expect(await bandWords($)).toContain(label)
+  }
 })

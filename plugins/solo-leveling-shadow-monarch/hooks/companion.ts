@@ -1,4 +1,4 @@
-import type { Phase } from '../types'
+import type { Phase, ToolKind } from '../types'
 import { ART } from './art.js'
 import type { Art } from './art.js'
 
@@ -23,20 +23,22 @@ const HUNTER: Record<'idle' | 'dash', Pose> = {
   dash: { art: ART.hunterDash, head: [270, 6], slash: 'M300 80 Q430 20 420 -30' },
 }
 
-function pick(kind: Kind, phase: Phase): Pose {
+function pick(kind: Kind, phase: Phase, tool: ToolKind): Pose {
   if (kind === 'hunter') {
-    return phase === 'tools' || phase === 'generating' ? HUNTER.dash : HUNTER.idle
+    const isFast = phase === 'generating' || (phase === 'tools' && (tool === 'shell' || tool === 'mcp' || tool === 'edit'))
+
+    return isFast ? HUNTER.dash : HUNTER.idle
   }
 
-  if (phase === 'generating') {
+  if (phase === 'generating' || (phase === 'tools' && tool === 'edit')) {
     return KNIGHT.raised
   }
 
-  if (phase === 'tools') {
+  if (phase === 'tools' && (tool === 'shell' || tool === 'mcp')) {
     return KNIGHT.dash
   }
 
-  return phase === 'done' ? KNIGHT.kneel : KNIGHT.idle
+  return phase === 'done' || phase === 'waiting' ? KNIGHT.kneel : KNIGHT.idle
 }
 
 export function companionCss(tone: CompanionTone) {
@@ -67,6 +69,8 @@ export function companionCss(tone: CompanionTone) {
 .c-exec .k-ghost{animation:k-ghost 3.4s ease-out infinite}
 .c-exec .k-slash{animation:k-slash 3.4s ease-out infinite}
 .c-exec .k-aura{opacity:.8}
+.c-wait .k-rig{animation:k-breathe 4s ease-in-out infinite}
+.c-wait .k-aura{opacity:.9;animation:k-aura 2.6s ease-in-out infinite}
 .c-done .k-ring{animation:k-ring 2.4s ease-out 1 forwards}
 .c-done .k-aura{opacity:.9}
 .c-err .k-rig{animation:k-breathe 1.4s ease-in-out infinite}
@@ -80,18 +84,20 @@ const STATE: Record<Phase, string> = {
   tools: 'c-exec',
   done: 'c-done',
   error: 'c-err',
+  waiting: 'c-wait',
+  compacting: 'c-think',
 }
 
-export function companion(phase: Phase, kind: Kind, at: { x: number; y: number; scale: number }) {
-  const pose = pick(kind, phase)
+export function companion(phase: Phase, kind: Kind, tool: ToolKind, at: { x: number; y: number; scale: number }) {
+  const pose = pick(kind, phase, tool)
   const a = pose.art
   const ghosts =
-    phase === 'tools'
+    phase === 'tools' && (tool === 'shell' || tool === 'mcp')
       ? `<g class="k-ghost" transform="translate(-110,0)"><path d="${a.d}"/></g>`
       : ''
-  const slash = phase === 'tools' && pose.slash ? `<path class="k-slash" d="${pose.slash}"/>` : ''
+  const slash = phase === 'tools' && (tool === 'shell' || tool === 'mcp') && pose.slash ? `<path class="k-slash" d="${pose.slash}"/>` : ''
   const runes =
-    phase === 'thinking'
+    phase === 'thinking' || phase === 'compacting'
       ? `<g class="k-spin"><circle class="k-rune" cx="${pose.head[0]}" cy="${pose.head[1]}" r="46"/></g><g class="k-spin"><circle class="k-rune" cx="${pose.head[0]}" cy="${pose.head[1]}" r="62"/></g>`
       : ''
   const ring =

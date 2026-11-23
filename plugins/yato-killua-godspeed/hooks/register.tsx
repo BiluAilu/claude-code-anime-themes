@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { Register, ThemeSetArgs } from 'claude-code'
 
-import type { Mode, Phase } from '../types'
+import type { Counts, Mode, Phase, ToolKind } from '../types'
+import { kindOf } from './kinds.js'
 import { GLASS, colorsFor, styleFor } from './palette.js'
 import { buildScene } from './scene.js'
 
@@ -12,6 +13,9 @@ const DEFAULT_MODE: Mode = 'dual'
 const phase = atom({ plugin: 'yato-killua-godspeed', key: 'phase' } as const, 'idle')
 const mode = atom({ plugin: 'yato-killua-godspeed', key: 'mode' } as const, DEFAULT_MODE)
 const pct = atom({ plugin: 'yato-killua-godspeed', key: 'pct' } as const, 0)
+const counts = atom({ plugin: 'yato-killua-godspeed', key: 'counts' } as const, { turns: 0, tools: 0, failures: 0, steps: 0, agents: 0, permissions: 0, denials: 0, compactions: 0 })
+const tool = atom({ plugin: 'yato-killua-godspeed', key: 'tool' } as const, 'shell')
+const running = atom({ plugin: 'yato-killua-godspeed', key: 'running' } as const, 0)
 
 const LABEL: Record<Phase, string> = {
   idle: 'calm',
@@ -20,6 +24,17 @@ const LABEL: Record<Phase, string> = {
   tools: 'godspeed',
   done: 'done',
   error: 'error',
+  waiting: 'awaiting your word',
+  compacting: 'cleansing',
+}
+
+const TOOL_LABEL: Record<ToolKind, string> = {
+  shell: 'dash',
+  edit: 'slash',
+  read: 'scout',
+  web: 'gate',
+  agent: 'summon',
+  mcp: 'lightning',
 }
 
 function isMode(value: unknown): value is Mode {
@@ -31,6 +46,7 @@ import type { EngineInterface } from 'claude-code'
 // The module's own variables restart on reload; the atoms above do not.
 let current: Phase = 'idle'
 let warned = 0
+let before = 0
 let calmTimer: { cancel: () => void } | undefined
 
 async function setPhase($: EngineInterface, next: Phase) {
@@ -55,7 +71,7 @@ async function refreshContext($: EngineInterface) {
   const { context } = await $.session.usage()
 
   if (context.percent === undefined) {
-    return
+    return 0
   }
   const value = Math.round(context.percent)
   await update($, pct, () => value)
@@ -67,6 +83,16 @@ async function refreshContext($: EngineInterface) {
     $.ui.toast(`Context ${value}% full - consider /compact`)
   }
   warned = band
+
+  return value
+}
+
+async function bump($: EngineInterface, key: keyof Counts) {
+  await update($, counts, c => ({ ...c, [key]: c[key] + 1 }))
+}
+
+async function setTool($: EngineInterface, name: string) {
+  await update($, tool, () => kindOf(name))
 }
 
 async function applyLook($: EngineInterface, which: Mode) {
@@ -111,7 +137,16 @@ export const register: Register = on => {
     if (want === '') {
       const now = await read($, mode)
 
-      return { text: `Mode: ${now}. Use /godspeed divine, godspeed or dual.` }
+      return { text: `Mode: ${now}. Use /godspeed divine, godspeed, dual or status.` }
+    }
+
+    if (want === 'status') {
+      const c = await read($, counts)
+      const r = await read($, running)
+
+      return {
+        text: `Real events seen this session: turns ${c.turns}, model steps ${c.steps}, tool calls ${c.tools}, tool failures ${c.failures}, subagents started ${c.agents} (${r} running), permission prompts ${c.permissions}, denials ${c.denials}, compactions ${c.compactions}. State: ${await read($, phase)}. Context: ${await read($, pct)}%. Mode: ${await read($, mode)}.`,
+      }
     }
 
     if (!isMode(want)) {
@@ -133,7 +168,13 @@ export const register: Register = on => {
       return next(e)
     }
     const { Svg } = $.ui.resolve(e)
-    const svg = buildScene({ mode: await read($, mode), phase: await read($, phase), pct: await read($, pct) })
+    const svg = buildScene({
+      mode: await read($, mode),
+      phase: await read($, phase),
+      pct: await read($, pct),
+      tool: await read($, tool),
+      agents: await read($, running),
+    })
 
     return <Svg source={svg} alt="A midnight shrine gate under drifting blue light, with lightning at the edge" isInteractive />
   })
@@ -148,13 +189,16 @@ export const register: Register = on => {
     const percent = await read($, pct)
     const m = await read($, mode)
     const warn = percent >= 80
+    const r = await read($, running)
+    const k = await read($, tool)
+    const state = p === 'tools' ? `${LABEL[p]} · ${TOOL_LABEL[k]}` : LABEL[p]
 
     return (
       <Box>
         <Text color="#8CCEFF">⛩ </Text>
         <Text color="#426BFF">━━</Text>
         <Text color="#00F0FF"> ⚡ </Text>
-        <Text color="#C8D9EA">{m} · {LABEL[p]}</Text>
+        <Text color={p === 'waiting' ? '#FFB02E' : '#C8D9EA'}>{m} · {state}{r > 0 ? ` · spirits ${r}` : ''}</Text>
         {percent > 0 && <Text color={warn ? '#FFB02E' : '#8CCEFF'}> · context {percent}%</Text>}
       </Box>
     )
@@ -170,6 +214,10 @@ export const register: Register = on => {
 
   // Reads the stream as it passes: thinking, text and tool starts are real events.
   on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) {
+      await bump($, 'steps')
+    }
+
     for await (const chunk of next(e)) {
       if (e.agentId === undefined) {
         if (chunk.kind === 'thinking') {
@@ -177,6 +225,7 @@ export const register: Register = on => {
         } else if (chunk.kind === 'text') {
           await setPhase($, 'generating')
         } else if (chunk.kind === 'tool') {
+          await setTool($, chunk.name)
           await setPhase($, 'tools')
         }
       }
@@ -185,10 +234,13 @@ export const register: Register = on => {
   })
 
   on('tool.call', async ($, e, next) => {
+    await setTool($, e.tool)
     await setPhase($, 'tools')
+    await bump($, 'tools')
     const ran = await next(e)
 
     if (ran.deny === undefined && ran.isError === true) {
+      await bump($, 'failures')
       await setPhase($, 'error')
       $.ui.status(`⚡ ${e.tool} failed`)
     }
@@ -197,7 +249,72 @@ export const register: Register = on => {
     return ran
   })
 
+  // A tool that finished, well or badly, means any permission wait before it is over.
+  on('classic.PostToolUse', async ($, e, next) => {
+    if (current === 'waiting') {
+      await setPhase($, 'thinking')
+    }
+
+    return next(e)
+  })
+
+  on('classic.PostToolUseFailure', async ($, e, next) => {
+    if (current === 'waiting') {
+      await setPhase($, 'thinking')
+    }
+
+    return next(e)
+  })
+
+  on('classic.PermissionRequest', async ($, e, next) => {
+    await bump($, 'permissions')
+    await setTool($, e.tool_name)
+    await setPhase($, 'waiting')
+    $.ui.toast(`Awaiting your approval: ${e.tool_name}`)
+
+    return next(e)
+  })
+
+  on('classic.PermissionDenied', async ($, e, next) => {
+    await bump($, 'denials')
+    await setPhase($, 'error')
+
+    return next(e)
+  })
+
+  on('classic.SubagentStart', async ($, e, next) => {
+    await bump($, 'agents')
+    await update($, running, n => n + 1)
+    $.ui.toast(`A spirit answers the call: ${e.agent_type}`)
+
+    return next(e)
+  })
+
+  on('classic.SubagentStop', async ($, e, next) => {
+    await update($, running, n => Math.max(0, n - 1))
+
+    return next(e)
+  })
+
+  on('classic.PreCompact', async ($, e, next) => {
+    before = await read($, pct)
+    await setPhase($, 'compacting')
+
+    return next(e)
+  })
+
+  on('classic.PostCompact', async ($, e, next) => {
+    await bump($, 'compactions')
+    const after = await refreshContext($).catch(() => 0)
+    warned = after >= 90 ? 90 : after >= 80 ? 80 : 0
+    await setPhase($, 'idle')
+    $.ui.toast(`Context compacted: ${before}% → ${after}%`)
+
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
+    await bump($, 'turns')
     await refreshContext($).catch(() => undefined)
     await setPhase($, e.reason === 'error' ? 'error' : e.isAborted ? 'idle' : 'done')
     $.ui.status(undefined)

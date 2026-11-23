@@ -1,4 +1,4 @@
-import type { Mode, Phase } from '../types'
+import type { Mode, Phase, ToolKind } from '../types'
 
 // Cinematic scene, 1600x900, pure vector, CSS animation only.
 // Yato (left): a great torii in Sekki light, rays, a haloed moon, drifting petals.
@@ -13,6 +13,8 @@ const BASE: Record<Phase, Weights> = {
   tools: { yato: 0.75, bolt: 1.15, period: 4.5, drift: 1.1, speed: 1 },
   done: { yato: 1.3, bolt: 0.45, period: 12, drift: 1, speed: 0 },
   error: { yato: 0.7, bolt: 0.8, period: 6, drift: 0.8, speed: 0 },
+  waiting: { yato: 1, bolt: 0.2, period: 16, drift: 0.8, speed: 0 },
+  compacting: { yato: 1.1, bolt: 0.3, period: 12, drift: 2.2, speed: 0 },
 }
 
 const MODE_SCALE: Record<Mode, { yato: number; bolt: number }> = {
@@ -71,7 +73,7 @@ function speedLines(show: boolean, power: number) {
   return { css, out }
 }
 
-export function buildScene(args: { mode: Mode; phase: Phase; pct: number }) {
+export function buildScene(args: { mode: Mode; phase: Phase; pct: number; tool: ToolKind; agents: number }) {
   const { mode, phase } = args
   const pct = clamp(args.pct, 0, 100)
   const w = BASE[phase]
@@ -86,10 +88,49 @@ export function buildScene(args: { mode: Mode; phase: Phase; pct: number }) {
   const yVis = clamp(yato, 0, 1)
   const bVis = clamp(m.bolt, 0, 1)
   const mo = motes(Math.round(8 + 22 * yVis), w.drift, 0.35 + 0.5 * yVis)
-  const sp = speedLines(w.speed > 0 && m.bolt > 0.3, w.speed * m.bolt)
+  const speedKind = phase !== 'tools' || args.tool === 'shell' || args.tool === 'mcp'
+  const sp = speedLines(w.speed > 0 && m.bolt > 0.3 && speedKind, w.speed * m.bolt)
   const lo = (0.4 * bolt0).toFixed(2)
   const hi = clamp(bolt0, 0, 1).toFixed(2)
   const mi = (0.62 * bolt0).toFixed(2)
+
+  // The effect follows the kind of the real tool that is running.
+  let fx = ''
+
+  if (phase === 'tools') {
+    if (args.tool === 'mcp') {
+      fx += '<path class="zapbolt" d="M1000 0 L960 140 L1010 180 L950 340 L1000 380 L940 560"/>'
+    }
+
+    if (args.tool === 'edit') {
+      fx += '<path class="cut" d="M120 120 Q480 360 880 780"/><path class="cut cut2" d="M200 80 Q560 340 960 700"/>'
+    }
+
+    if (args.tool === 'read') {
+      fx += '<circle class="sonar" cx="420" cy="300" r="40"/><circle class="sonar so2" cx="420" cy="300" r="40"/><circle class="sonar so3" cx="420" cy="300" r="40"/>'
+    }
+
+    if (args.tool === 'web') {
+      fx += '<rect class="beam" x="386" y="0" width="68" height="240" fill="url(#g-beam)"/>'
+    }
+
+    if (args.tool === 'agent') {
+      fx += '<ellipse class="summon" cx="420" cy="660" rx="150" ry="24"/><ellipse class="summon su2" cx="420" cy="660" rx="150" ry="24"/>'
+    }
+  }
+
+  if (phase === 'waiting') {
+    fx += '<circle class="wait-glow" cx="420" cy="300" r="300" fill="url(#g-wait)"/><circle class="wait-ring" cx="420" cy="300" r="180"/><circle class="wait-ring wr2" cx="420" cy="300" r="180"/>'
+  }
+
+  if (phase === 'compacting') {
+    fx += '<rect width="1600" height="900" fill="url(#g-purge)" opacity="0.7"/><circle class="purge" cx="420" cy="300" r="320"/><circle class="purge pu2" cx="420" cy="300" r="320"/><circle class="purge pu3" cx="420" cy="300" r="320"/>'
+  }
+  let orbs = ''
+
+  for (let i = 0; i < Math.min(args.agents, 6); i++) {
+    orbs += `<g class="orbit ob${i}"><circle class="orb-halo" cx="${600 + (i % 3) * 22}" cy="300" r="20"/><circle class="orb" cx="${600 + (i % 3) * 22}" cy="300" r="8"/></g>`
+  }
 
   const flash = phase === 'done' ? '<rect class="flash" width="1600" height="900" fill="url(#g-flash)"/>' : ''
   const hotV = hot > 0 ? `<rect width="1600" height="900" fill="url(#g-hot)" opacity="${(0.3 + hot * 0.5).toFixed(2)}"/>` : ''
@@ -128,10 +169,46 @@ ${mo.css}
 ${sp.css}
 @keyframes dash{0%{stroke-dashoffset:1600;opacity:0}12%{opacity:1}65%,100%{stroke-dashoffset:-260;opacity:0}}
 .crest{opacity:.8}
+.zapbolt{fill:none;stroke:#00F0FF;stroke-width:5;stroke-linejoin:round;opacity:0;animation:zap 4.5s ease-in-out infinite}
+@keyframes zap{0%,70%,100%{opacity:0}74%{opacity:1}78%{opacity:.2}82%{opacity:.9}90%{opacity:0}}
+.cut{fill:none;stroke:#BDE4FF;stroke-width:9;stroke-linecap:round;stroke-dasharray:1300;stroke-dashoffset:1300;opacity:0;animation:cut 2.6s ease-out infinite}
+.cut2{stroke-width:4;animation-delay:.2s}
+@keyframes cut{0%,12%{stroke-dashoffset:1300;opacity:0}18%{opacity:1}40%{stroke-dashoffset:0;opacity:.9}70%,100%{stroke-dashoffset:-1300;opacity:0}}
+.sonar{fill:none;stroke:#8CCEFF;stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:sonar 3s ease-out infinite}
+.so2{animation-delay:1s}.so3{animation-delay:2s}
+@keyframes sonar{0%{transform:scale(.4);opacity:.9}100%{transform:scale(9);opacity:0}}
+.beam{opacity:.7;animation:breathe 2.4s ease-in-out infinite}
+.summon{fill:none;stroke:#8CCEFF;stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:summon 2.6s ease-out infinite}
+.su2{animation-delay:1.3s}
+@keyframes summon{0%{transform:scale(.3);opacity:.9}100%{transform:scale(3.2);opacity:0}}
+.wait-glow{animation:breathe 2.6s ease-in-out infinite}
+.wait-ring{fill:none;stroke:#FFB02E;stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:waitring 2.6s ease-out infinite}
+.wr2{animation-delay:1.3s}
+@keyframes waitring{0%{transform:scale(.5);opacity:.8}100%{transform:scale(1.5);opacity:0}}
+.purge{fill:none;stroke:#8CCEFF;stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:purge 2.4s ease-in infinite}
+.pu2{animation-delay:.8s}.pu3{animation-delay:1.6s}
+@keyframes purge{0%{transform:scale(1.6);opacity:0}30%{opacity:.8}100%{transform:scale(.1);opacity:0}}
+.orbit{transform-origin:420px 300px;animation:orbit 22s linear infinite}
+.ob1{animation-delay:-4s}.ob2{animation-delay:-8s}.ob3{animation-delay:-12s}.ob4{animation-delay:-16s}.ob5{animation-delay:-19s}
+@keyframes orbit{to{transform:rotate(360deg)}}
+.orb{fill:#EAF5FF}
+.orb-halo{fill:#8CCEFF;opacity:.3}
 .flash{opacity:0;animation:flash 2.4s ease-out 1 forwards}
 @keyframes flash{0%{opacity:0}10%{opacity:.8}100%{opacity:.14}}
 </style>
 <defs>
+<linearGradient id="g-beam" x1="0" y1="1" x2="0" y2="0">
+<stop offset="0" stop-color="#8CCEFF" stop-opacity="0.7"/>
+<stop offset="1" stop-color="#8CCEFF" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="g-wait" cx="0.5" cy="0.5" r="0.5">
+<stop offset="0" stop-color="#FFB02E" stop-opacity="0.45"/>
+<stop offset="1" stop-color="#FFB02E" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="g-purge" cx="0.26" cy="0.34" r="0.8">
+<stop offset="0.3" stop-color="#000" stop-opacity="0"/>
+<stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+</radialGradient>
 <linearGradient id="g-sky" x1="0" y1="0" x2="0.6" y2="1">
 <stop offset="0" stop-color="${mode === 'godspeed' ? '#05070D' : '#060C20'}"/>
 <stop offset="0.5" stop-color="${mode === 'godspeed' ? '#0A0F1A' : '#0F1C42'}"/>
@@ -204,6 +281,7 @@ ${w.speed > 0.5 ? bolt(T_MAIN, 'bolt-t') : ''}
 <path d="M-22 -12 Q0 -22 22 -12 M-18 -2 L18 -2 M-14 -12 L-14 20 M14 -12 L14 20" fill="none" stroke="#EAF5FF" stroke-width="3" stroke-linecap="round" opacity=".8"/>
 <path d="M6 -34 L-8 2 L2 2 L-6 34 L12 -6 L2 -6 Z" fill="#00F0FF" opacity=".85"/>
 </g>
+${fx}${orbs}
 ${hotV}${errV}${flash}
 </svg>`
 }

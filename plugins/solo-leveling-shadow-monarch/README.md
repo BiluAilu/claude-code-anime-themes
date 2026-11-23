@@ -20,6 +20,10 @@ The companion stands in the left margin: the horned shadow knight in Monarch and
 | Turn completes | Knight kneels, one violet flash, expanding ring, then calm after 5 s |
 | Tool failure or API error | Red eyes, red vignette and cracks, "penalty" |
 | Context 80% or more | Amber vignette; toast at 80% and again at 90% |
+| Subagent starts or stops | A glowing soldier arises beside the knight per running subagent (up to 6); band shows `soldiers N` |
+| Permission prompt shown | Knight kneels, amber glow and rings, band says "awaiting your word"; ends when the tool finishes |
+| Context compaction | Purge: rings contract inward, vignette darkens; a toast shows the real before and after percentage |
+| Tool kind (from the real tool name) | Edit/Write: sword raised and a slash. Read/Grep/Glob: sonar rings. WebFetch/WebSearch: light beam. Agent/Task: summon rings. MCP: cyan lightning. Bash and others: dash |
 
 Counts, the context percentage and the turn length shown in toasts come from the engine (`tool.call`, `turn.step`, `turn.complete`, `$.session.usage()`). The only timer returns the scene to calm 5 s (6.5 s after an error) after a finish. Nothing is simulated.
 
@@ -28,7 +32,7 @@ Counts, the context percentage and the turn length shown in toasts come from the
 
 ## Commands
 - `/shadow` shows the current world. `/shadow system|monarch|dungeon` switches (remembered across sessions).
-- `/shadow status` prints the real event counts this session received. Use it to confirm the integrations work live.
+- `/shadow status` prints the real event counts this session received (turns, steps, tools, failures, subagents, permission prompts, denials, compactions). Use it to confirm the integrations work live.
 
 ## Install and rollback
 Install from a folder: run `claude --plugin-dir <this folder>` (or set `CLAUDE_CODE_PLUGIN_DIRS`), or install from a marketplace that lists it. Rollback: remove the plugin or its folder; your settings are never changed. A session holds one theme at a time, so a theme mod loaded later replaces this look until you run `/shadow` again (and `/godspeed` for the Yato x Killua mod).
@@ -42,4 +46,6 @@ Not supported or not done:
 - Scene changes redraw the scene, so the animation restarts on each state change; there is no cross-fade. The scene was kept free of a scene-wide fade because it would blank wherever the app holds the scene still.
 - The companion sits in the left margin and is cropped on narrow windows.
 - Reduced motion: the app stops the animation and shows the scene at rest.
+- A permission wait ends when the tool finishes (the classic PostToolUse event), so a long approved tool still shows the wait until it is done; there is no separate event for the moment of approval.
+- Subagent counts come from the SubagentStart and SubagentStop events; if the engine does not fire them in some mode, the soldiers will not appear.
 - Tests exercise the hooks against the documented event shapes; whether your app version draws mod backdrops can only be confirmed by looking.

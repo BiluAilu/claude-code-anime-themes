@@ -1,6 +1,16 @@
-export type Phase = 'idle' | 'thinking' | 'generating' | 'tools' | 'done' | 'error'
+export type Phase = 'idle' | 'thinking' | 'generating' | 'tools' | 'done' | 'error' | 'waiting' | 'compacting'
 export type Mode = 'system' | 'monarch' | 'dungeon'
-export type Counts = { turns: number; tools: number; failures: number; steps: number }
+export type ToolKind = 'shell' | 'edit' | 'read' | 'web' | 'agent' | 'mcp'
+export type Counts = {
+  turns: number
+  tools: number
+  failures: number
+  steps: number
+  agents: number
+  permissions: number
+  denials: number
+  compactions: number
+}
 
 declare module 'claude-code' {
   interface PluginState {
@@ -9,6 +19,8 @@ declare module 'claude-code' {
       mode: Mode
       pct: number
       counts: Counts
+      tool: ToolKind
+      running: number
     }
   }
 }
