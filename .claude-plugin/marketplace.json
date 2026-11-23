@@ -8,6 +8,11 @@
       "name": "yato-killua-godspeed",
       "source": "./plugins/yato-killua-godspeed",
       "description": "Yato x Killua - Godspeed Divine Edition: midnight shrine-blue meets Godspeed lightning, with an animated backdrop that follows real session activity."
+    },
+    {
+      "name": "solo-leveling-shadow-monarch",
+      "source": "./plugins/solo-leveling-shadow-monarch",
+      "description": "Solo Leveling - Shadow Monarch: three worlds (System, Monarch, Dungeon), a shadow-knight companion with a pose per state, and a shadow army that grows with real tool calls."
     }
   ],
   "metadata": {

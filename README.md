@@ -9,6 +9,11 @@ Yato's calm shrine-blue (Noragami) meets Killua's Godspeed lightning (Hunter x H
 
 Switch modes with `/godspeed divine`, `/godspeed godspeed` or `/godspeed dual` (default).
 
+### Solo Leveling - Shadow Monarch
+Three different worlds in layered, animated vector art: **Monarch** (a throne room with a cracked black moon and a shadow army that grows with every real tool call), **System** (a hunter HUD, a jagged Gate and a city) and **Dungeon** (a red eclipse and colossal sentinels). A companion changes pose with what Claude is doing: standing, sword raised, dash, kneel. The status band shows real counts and the real context meter only.
+
+Switch worlds with `/shadow system`, `/shadow monarch` or `/shadow dungeon`, and run `/shadow status` to see the real events the session has received.
+
 More themes coming.
 
 ## Install
@@ -23,6 +28,12 @@ From a shell:
 
 ```
 claude plugin install yato-killua-godspeed --marketplace BiluAilu/claude-code-anime-themes
+```
+
+For Solo Leveling:
+
+```
+/plugin install solo-leveling-shadow-monarch --marketplace BiluAilu/claude-code-anime-themes
 ```
 
 In the desktop app, where `/plugin` does not run: click + next to the prompt box, then Plugins, Add marketplace with `BiluAilu/claude-code-anime-themes`, then Add plugin.

@@ -1,0 +1,8 @@
+{
+  "name": "solo-leveling-shadow-monarch",
+  "version": "0.1.0",
+  "description": "SOLO LEVELING - Shadow Monarch: an AAA anime-RPG look with three worlds (System, Monarch, Dungeon), an animated shadow-knight companion and a shadow army that grows with real tool calls.",
+  "author": { "name": "BiluAilu" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
