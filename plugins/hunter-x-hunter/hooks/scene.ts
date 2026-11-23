@@ -2,7 +2,8 @@ import type { Mode, Phase, ToolKind, Who } from '../types'
 import { CAST, partyOf } from './cast.js'
 import { companion, companionCss } from './companion.js'
 import { place } from './place.js'
-import { TONE, WORLD, clamp, tintTone } from './worlds.js'
+import { ld, mix } from './tint.js'
+import { WORLD, clamp, modeTone } from './worlds.js'
 
 // Composes one world, the companion and the effects of what the session is doing.
 // Pure vector, CSS animation only, no inline styles; well under the 131072 limit.
@@ -32,14 +33,15 @@ export function buildScene(args: {
 }) {
   const { mode, phase } = args
   const member = CAST[args.who]
-  const ac = member.accent
-  const tone = tintTone(TONE[mode], ac)
+  // In light mode the character's color is deepened so it stays visible on a pale sky.
+  const acs = ld(mix(member.accent, '#1A2452', 0.5), member.accent)
+  const { tone, dark } = modeTone(mode, member.accent)
   const pct = clamp(args.pct, 0, 100)
   const p = PHASE[phase]
   const hot = pct >= 80 ? clamp((pct - 75) / 25, 0.2, 1) : 0
   const world = WORLD[mode]({ tone, energy: p.energy, drift: p.drift, pct, army: args.army, fails: args.fails })
   const isError = phase === 'error'
-  const shock = isError ? '#FF4D63' : ac
+  const shock = isError ? '#FF4D63' : acs
 
   // The effect follows the kind of the real tool that is running, and who is working.
   const kx = HERO.x
@@ -121,7 +123,7 @@ export function buildScene(args: {
 
   for (const f of friends) {
     const c = CAST[f]
-    partyCss += `.sum-${c.id}{stroke:${c.accent}}\n`
+    partyCss += `.sum-${c.id}{stroke:${ld(mix(c.accent, '#1A2452', 0.5), c.accent)}}\n`
   }
   const shockRing =
     (phase === 'tools' && (args.tool === 'shell' || args.tool === 'mcp')) || phase === 'done'
@@ -137,43 +139,43 @@ export function buildScene(args: {
 @keyframes rise{0%{transform:translate(0,50px);opacity:0}25%{opacity:.85}60%{transform:translate(16px,-110px);opacity:.55}100%{transform:translate(-8px,-260px);opacity:0}}
 .shock{fill:none;stroke:${shock};stroke-width:4;opacity:0;transform-origin:${kx}px ${ky - 150}px;animation:shock 3.4s ease-out infinite}
 @keyframes shock{0%,14%{transform:scale(.4);opacity:0}20%{opacity:.8}100%{transform:scale(7);opacity:0}}
-.big-ring{fill:none;stroke:${ac};stroke-width:5;opacity:0;transform-origin:${kx}px ${ky - 150}px;animation:bigring 2.6s ease-out 1 forwards}
+.big-ring{fill:none;stroke:${acs};stroke-width:5;opacity:0;transform-origin:${kx}px ${ky - 150}px;animation:bigring 2.6s ease-out 1 forwards}
 @keyframes bigring{0%{transform:scale(.3);opacity:.95}100%{transform:scale(13);opacity:0}}
-.speed{fill:none;stroke:${ac};stroke-width:2;stroke-linecap:round;stroke-dasharray:150 1500;stroke-dashoffset:1600;animation:dash 2.6s ease-out infinite}
+.speed{fill:none;stroke:${acs};stroke-width:2;stroke-linecap:round;stroke-dasharray:150 1500;stroke-dashoffset:1600;animation:dash 2.6s ease-out infinite}
 .sp1{animation-delay:.4s}.sp2{animation-delay:.9s}.sp3{animation-delay:1.3s}.sp4{animation-delay:1.8s}.sp5{animation-delay:2.2s}
 @keyframes dash{0%{stroke-dashoffset:1600;opacity:0}12%{opacity:1}65%,100%{stroke-dashoffset:-260;opacity:0}}
 .flash{opacity:0;animation:flash 2.4s ease-out 1 forwards}
 @keyframes flash{0%{opacity:0}10%{opacity:.75}100%{opacity:.1}}
-.sum{fill:#05080F;stroke:${tone.glow2};stroke-width:5;fill-rule:evenodd;animation:glow 2s ease-in-out infinite}
+.sum{fill:${ld('#142049', '#05080F')};stroke:${tone.glow2};stroke-width:5;fill-rule:evenodd;animation:glow 2s ease-in-out infinite}
 ${partyCss}.zapbolt{fill:none;stroke:#00F0FF;stroke-width:5;stroke-linejoin:round;opacity:0;animation:zap 4.5s ease-in-out infinite}
 @keyframes zap{0%,70%,100%{opacity:0}74%{opacity:1}78%{opacity:.2}82%{opacity:.9}90%{opacity:0}}
-.cut{fill:none;stroke:${ac};stroke-width:9;stroke-linecap:round;stroke-dasharray:700;stroke-dashoffset:700;opacity:0;animation:cut 2.6s ease-out infinite}
+.cut{fill:none;stroke:${acs};stroke-width:9;stroke-linecap:round;stroke-dasharray:700;stroke-dashoffset:700;opacity:0;animation:cut 2.6s ease-out infinite}
 .cut2{stroke-width:7;animation-delay:.12s}
 .cut3{stroke-width:5;animation-delay:.24s}
 @keyframes cut{0%,12%{stroke-dashoffset:700;opacity:0}18%{opacity:1}40%{stroke-dashoffset:0;opacity:.9}70%,100%{stroke-dashoffset:-700;opacity:0}}
-.wavecut{fill:none;stroke:${ac};stroke-width:18;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;opacity:0;animation:cut 2.8s ease-out infinite}
+.wavecut{fill:none;stroke:${acs};stroke-width:18;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;opacity:0;animation:cut 2.8s ease-out infinite}
 .wv2{stroke-width:7;animation-delay:.18s}
-.spark{fill:#FFFFFF;opacity:0;animation:spark 1.6s ease-out infinite}
+.spark{fill:${ld('#16306A', '#FFFFFF')};opacity:0;animation:spark 1.6s ease-out infinite}
 .sk2{animation-delay:.3s}.sk3{animation-delay:.6s}
 @keyframes spark{0%{opacity:0;transform:scale(.3)}30%{opacity:1}100%{opacity:0;transform:scale(2.6)}}
-.burstw{fill:none;stroke:${ac};stroke-width:6;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:burstw 1.4s ease-out infinite}
+.burstw{fill:none;stroke:${acs};stroke-width:6;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:burstw 1.4s ease-out infinite}
 .bw2{animation-delay:.7s}
 @keyframes burstw{0%{transform:scale(.3);opacity:.95}100%{transform:scale(4);opacity:0}}
-.rays{fill:none;stroke:${ac};stroke-width:5;stroke-linecap:round;opacity:0;animation:rays 1.4s ease-out infinite}
+.rays{fill:none;stroke:${acs};stroke-width:5;stroke-linecap:round;opacity:0;animation:rays 1.4s ease-out infinite}
 @keyframes rays{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
-.chainw{fill:none;stroke:${ac};stroke-width:6;stroke-linecap:round;stroke-dasharray:16 10;opacity:.9;animation:chainw 1.1s linear infinite}
+.chainw{fill:none;stroke:${acs};stroke-width:6;stroke-linecap:round;stroke-dasharray:16 10;opacity:.9;animation:chainw 1.1s linear infinite}
 .cw2{animation-duration:1.5s}.cw3{animation-duration:.9s}
 @keyframes chainw{to{stroke-dashoffset:-104}}
-.slamw{fill:none;stroke:${ac};stroke-width:6;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:slamw 1.5s ease-out infinite}
+.slamw{fill:none;stroke:${acs};stroke-width:6;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:slamw 1.5s ease-out infinite}
 .sl2{animation-delay:.75s}
 @keyframes slamw{0%{transform:scale(.3);opacity:.95}100%{transform:scale(6);opacity:0}}
-.ribw{fill:none;stroke:${ac};stroke-width:10;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;opacity:0;animation:cut 2.8s ease-in-out infinite}
+.ribw{fill:none;stroke:${acs};stroke-width:10;stroke-linecap:round;stroke-dasharray:900;stroke-dashoffset:900;opacity:0;animation:cut 2.8s ease-in-out infinite}
 .rb2{stroke-width:5;animation-delay:.25s}
-.sonar{fill:none;stroke:${ac};stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:sonar 3s ease-out infinite}
+.sonar{fill:none;stroke:${acs};stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:sonar 3s ease-out infinite}
 .so2{animation-delay:1s}.so3{animation-delay:2s}
 @keyframes sonar{0%{transform:scale(.4);opacity:.9}100%{transform:scale(9);opacity:0}}
 .beam{opacity:.7;animation:glow 2.4s ease-in-out infinite}
-.summon{fill:none;stroke:${ac};stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:summon 2.6s ease-out infinite}
+.summon{fill:none;stroke:${acs};stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:50% 50%;animation:summon 2.6s ease-out infinite}
 .su2{animation-delay:1.3s}
 @keyframes summon{0%{transform:scale(.3);opacity:.9}100%{transform:scale(3.2);opacity:0}}
 .wait-glow{animation:glow 2.6s ease-in-out infinite}
@@ -184,11 +186,11 @@ ${partyCss}.zapbolt{fill:none;stroke:#00F0FF;stroke-width:5;stroke-linejoin:roun
 .pu2{animation-delay:.8s}.pu3{animation-delay:1.6s}
 @keyframes purge{0%{transform:scale(1.6);opacity:0}30%{opacity:.8}100%{transform:scale(.1);opacity:0}}
 .err-crack{fill:none;stroke:#FF4D63;stroke-width:3;stroke-linejoin:round;opacity:.7}
-${companionCss({ glow: tone.glow, eye: tone.eye, rim: tone.rim }, ac)}
+${companionCss({ glow: tone.glow, eye: tone.eye, rim: tone.rim }, acs)}
 ${world.css}`
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
-<style>${css}</style>
+<style>svg{color-scheme:light dark}${css}</style>
 <defs>
 <linearGradient id="g-knight" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="#101A30"/>
@@ -196,20 +198,20 @@ ${world.css}`
 <stop offset="1" stop-color="#020306"/>
 </linearGradient>
 <radialGradient id="g-aura" cx="0.5" cy="0.5" r="0.5">
-<stop offset="0" stop-color="${ac}" stop-opacity="0.5"/>
-<stop offset="1" stop-color="${ac}" stop-opacity="0"/>
+<stop offset="0" stop-color="${acs}" stop-opacity="0.5"/>
+<stop offset="1" stop-color="${acs}" stop-opacity="0"/>
 </radialGradient>
 <linearGradient id="g-beam" x1="0" y1="1" x2="0" y2="0">
-<stop offset="0" stop-color="${ac}" stop-opacity="0.7"/>
-<stop offset="1" stop-color="${ac}" stop-opacity="0"/>
+<stop offset="0" stop-color="${acs}" stop-opacity="0.7"/>
+<stop offset="1" stop-color="${acs}" stop-opacity="0"/>
 </linearGradient>
 <radialGradient id="g-wait" cx="0.5" cy="0.5" r="0.5">
 <stop offset="0" stop-color="#FFB02E" stop-opacity="0.45"/>
 <stop offset="1" stop-color="#FFB02E" stop-opacity="0"/>
 </radialGradient>
 <radialGradient id="g-purge" cx="0.2" cy="0.65" r="0.8">
-<stop offset="0.3" stop-color="#000" stop-opacity="0"/>
-<stop offset="1" stop-color="#000" stop-opacity="0.6"/>
+<stop offset="0.3" stop-color="${ld('#FFFFFF', '#000000')}" stop-opacity="0"/>
+<stop offset="1" stop-color="${ld('#FFFFFF', '#000000')}" stop-opacity="0.6"/>
 </radialGradient>
 <radialGradient id="g-lamp" cx="0.5" cy="0.5" r="0.5">
 <stop offset="0" stop-color="${tone.glow2}" stop-opacity="0.55"/>
@@ -217,7 +219,7 @@ ${world.css}`
 </radialGradient>
 <linearGradient id="g-water" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="${tone.glow}" stop-opacity="0.35"/>
-<stop offset="1" stop-color="#02060A" stop-opacity="0.95"/>
+<stop offset="1" stop-color="${ld('#9EC2C8', '#02060A')}" stop-opacity="0.95"/>
 </linearGradient>
 <linearGradient id="g-ray" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="${tone.glow2}" stop-opacity="0.4"/>
@@ -229,7 +231,7 @@ ${world.css}`
 <stop offset="1" stop-color="${tone.sky[2]}"/>
 </linearGradient>
 <radialGradient id="g-moon" cx="0.5" cy="0.5" r="0.5">
-<stop offset="0" stop-color="${tone.eye}" stop-opacity="0.6"/>
+<stop offset="0" stop-color="${ld('#FFFFFF', dark.eye)}" stop-opacity="0.6"/>
 <stop offset="0.5" stop-color="${tone.glow2}" stop-opacity="0.28"/>
 <stop offset="1" stop-color="${tone.glow}" stop-opacity="0"/>
 </radialGradient>
@@ -243,7 +245,7 @@ ${world.css}`
 <stop offset="1" stop-color="${tone.glow}" stop-opacity="0"/>
 </radialGradient>
 <radialGradient id="g-flash" cx="0.15" cy="0.85" r="1">
-<stop offset="0" stop-color="${tone.eye}" stop-opacity="0.8"/>
+<stop offset="0" stop-color="${ld('#FFFFFF', dark.eye)}" stop-opacity="0.8"/>
 <stop offset="1" stop-color="${tone.glow}" stop-opacity="0"/>
 </radialGradient>
 <radialGradient id="g-hot" cx="0.5" cy="0.5" r="0.75">

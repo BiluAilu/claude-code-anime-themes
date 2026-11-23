@@ -294,3 +294,27 @@ test('a subagent brings the next main character, named from the real roster', as
   expect(toasted.join('|')).toContain('Gon joins you: Explore')
   expect(toasted.join('|')).toContain('Kurapika joins you: Plan')
 })
+
+test('the appearance can be forced to light or dark and set back to follow the app', async ($, on) => {
+  engine(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const auto = await $.command.run({ command: 'hxh', args: 'status' })
+  expect(JSON.stringify(auto)).toContain('Appearance: auto')
+  const light = await $.command.run({ command: 'hxh', args: 'light' })
+  expect(JSON.stringify(light)).toContain('light look')
+  expect(JSON.stringify(await $.command.run({ command: 'hxh', args: 'status' }))).toContain('Appearance: light')
+  const dark = await $.command.run({ command: 'hxh', args: 'dark' })
+  expect(JSON.stringify(dark)).toContain('dark look')
+  const back = await $.command.run({ command: 'hxh', args: 'auto' })
+  expect(JSON.stringify(back)).toContain('Follows the app')
+  expect(JSON.stringify(await $.command.run({ command: 'hxh', args: 'status' }))).toContain('Appearance: auto')
+})
+
+test('the band still shows the character and state, whatever the mode', async ($, on) => {
+  engine(on)
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.command.run({ command: 'hxh', args: 'light' })
+  const words = await bandWords($)
+  expect(words).toContain('GODSPEED')
+  expect(words).toContain('Killua')
+})

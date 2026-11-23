@@ -1,7 +1,7 @@
 import type { Mode } from '../types'
 import { ART } from './art.js'
 import { place } from './place.js'
-import { mix } from './tint.js'
+import { ld, mix } from './tint.js'
 
 // Three worlds, each its own layered scene (far, middle, near), built from traced
 // original silhouettes plus vector glow, mist, particles and light.
@@ -19,6 +19,14 @@ export const TONE: Record<Mode, Tone> = {
   godspeed: { sky: ['#04060C', '#081426', '#0B2548'], glow: '#00A8FF', glow2: '#00F0FF', eye: '#E6FEFF', rim: '#00A8FF', ink: '#05080F' },
   arena: { sky: ['#170A2A', '#3B1655', '#C0502A'], glow: '#FF5E8A', glow2: '#FFB35C', eye: '#FFF1DD', rim: '#FF7A45', ink: '#0B0612' },
   estate: { sky: ['#04050A', '#0D1220', '#1A2440'], glow: '#9FB4FF', glow2: '#E6EDFF', eye: '#FFFFFF', rim: '#7B8CD9', ink: '#05070C' },
+}
+
+// The same three worlds by day: an overcast storm, a golden afternoon and a silver morning mist,
+// with deeper, more saturated lights so they stay visible on a pale sky.
+export const TONE_LIGHT: Record<Mode, Tone> = {
+  godspeed: { sky: ['#C6D6EA', '#DCE7F5', '#F0F5FB'], glow: '#1E78E6', glow2: '#0A63C9', eye: '#0B2A5A', rim: '#1E78E6', ink: '#DCE6F2' },
+  arena: { sky: ['#E6D5F2', '#F6DACB', '#FBE8C8'], glow: '#E0527A', glow2: '#D9772A', eye: '#5A2A10', rim: '#D9622E', ink: '#F0E1D5' },
+  estate: { sky: ['#C4CDE3', '#DBE1F0', '#F0F2F8'], glow: '#6E80D2', glow2: '#5063B8', eye: '#1F2A55', rim: '#6E80D2', ink: '#E0E4F0' },
 }
 
 // The world's lights move toward the character's own color; the sky and scenery keep their identity.
@@ -79,10 +87,12 @@ const COMMON = (t: Tone) => `
 @keyframes glow{0%,100%{opacity:.75}50%{opacity:1}}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes cheer{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
-.far{fill:#070B14;stroke:${t.rim};stroke-width:1;stroke-opacity:.3;opacity:.95;fill-rule:evenodd}
-.sil{fill:#03050A;stroke:${t.rim};stroke-width:1.5;fill-rule:evenodd}
-.sil-dim{fill:#06091A;stroke:${t.rim};stroke-width:1.2;stroke-opacity:.4;opacity:.9;fill-rule:evenodd}
+.far{fill:${ld('#C4CFE3', '#070B14')};stroke:${t.rim};stroke-width:1;stroke-opacity:.3;opacity:.95;fill-rule:evenodd}
+.sil{fill:${ld('#141C3A', '#03050A')};stroke:${t.rim};stroke-width:1.5;fill-rule:evenodd}
+.sil-dim{fill:${ld('#9AA9CC', '#06091A')};stroke:${t.rim};stroke-width:1.2;stroke-opacity:.4;opacity:.9;fill-rule:evenodd}
 .cloud{fill:${t.glow};opacity:.12;animation:cloud 60s linear infinite}
+.gstrip{fill:${ld('#C4CFE3', '#05080F')}}
+@media (prefers-color-scheme: light){.cloud{opacity:.35}}
 .cl2{animation-duration:90s;animation-delay:-30s}
 @keyframes cloud{0%{transform:translateX(-300px)}100%{transform:translateX(300px)}}
 `
@@ -97,6 +107,8 @@ export function godspeed(a: WorldArgs): Layer {
   const lo = (0.12 + 0.12 * en).toFixed(2)
   const hi = clamp(0.45 + 0.4 * en, 0, 1).toFixed(2)
   const period = (14 - en * 7).toFixed(1)
+  // On a pale sky the bolts need to stay stronger to read.
+  const loL = (0.45 + 0.2 * en).toFixed(2)
   let charge = ''
   const n = clamp(a.army, 0, 12)
 
@@ -107,10 +119,12 @@ export function godspeed(a: WorldArgs): Layer {
 .moon-halo{animation:glow 9s ease-in-out infinite}
 .moon-ring{fill:none;stroke:${t.glow2};stroke-width:3;opacity:.9}
 .moon-ring2{fill:none;stroke:${t.glow};stroke-width:1.4;stroke-dasharray:3 14;transform-box:fill-box;transform-origin:50% 50%;animation:spin 140s linear infinite}
-.moon{fill:#04060C;stroke:${t.glow};stroke-width:1.2;fill-rule:evenodd}
+.moon{fill:${ld('#F4F8FF', '#04060C')};stroke:${t.glow};stroke-width:1.2;fill-rule:evenodd}
 .bolt{fill:${t.glow2};stroke:${t.glow};stroke-width:12;stroke-opacity:.3;paint-order:stroke;fill-rule:evenodd;opacity:${lo};animation:flick ${period}s ease-in-out infinite}
 .bb{animation-delay:-3.1s}.bc{animation-delay:-6.4s}
 @keyframes flick{0%,100%{opacity:${lo}}6%{opacity:${hi}}12%{opacity:${lo}}18%{opacity:${hi}}30%{opacity:${lo}}}
+@keyframes flickl{0%,100%{opacity:${loL}}6%{opacity:1}12%{opacity:${loL}}18%{opacity:1}30%{opacity:${loL}}}
+@media (prefers-color-scheme: light){.bolt{opacity:${loL};stroke-opacity:.45;animation-name:flickl}.charge{fill:#0A63C9}}
 .charge{fill:${t.glow2};fill-rule:evenodd;opacity:.9}
 ${m1.css}${m2.css}${MIST_KEYFRAMES}
 ${m.css}`
@@ -121,7 +135,7 @@ ${place(ART.moon, { x: 1180, y: 240, s: 0.92, cls: 'moon', anchor: 'center' })}
 <circle class="moon-ring2" cx="1180" cy="240" r="166"/>
 <ellipse class="cloud" cx="760" cy="230" rx="260" ry="14"/>
 <g transform="translate(800,904) scale(0.95,0.62)"><path class="far" d="${ART.cityRoofs.d}" transform="translate(-850,-506)"/></g>
-<rect x="0" y="880" width="1600" height="20" fill="#05080F"/>
+<rect class="gstrip" x="0" y="880" width="1600" height="20"/>
 ${place(ART.lightning2, { x: 980, y: 644, s: 1.15, cls: 'bolt' })}
 ${place(ART.lightning1, { x: 1330, y: 700, s: 1.25, cls: 'bolt bb' })}
 ${place(ART.lightning3, { x: 1500, y: 600, s: 1.07, cls: 'bolt bc' })}
@@ -147,12 +161,13 @@ export function arena(a: WorldArgs): Layer {
   }
   const css = `${COMMON(t)}
 .sun-halo{animation:glow 10s ease-in-out infinite}
-.sun{fill:${t.glow2};opacity:.55}
+.sun{fill:${ld('#FFC36B', t.glow2)};opacity:.55}
+@media (prefers-color-scheme: light){.sun{opacity:.9}}
 .beam{fill:url(#g-ray);transform-origin:1230px 260px;animation:sweep 14s ease-in-out infinite}
 .beam2{animation-duration:19s;animation-delay:-6s}
 .beam3{animation-duration:23s;animation-delay:-12s}
 @keyframes sweep{0%,100%{transform:rotate(-26deg);opacity:.6}50%{transform:rotate(24deg);opacity:1}}
-.crowd{fill:#03050A;stroke:${t.glow2};stroke-width:3;stroke-opacity:.85;fill-rule:evenodd}
+.crowd{fill:${ld('#141C3A', '#03050A')};stroke:${t.glow2};stroke-width:3;stroke-opacity:.85;fill-rule:evenodd}
 .cheer0{animation:cheer 1.6s ease-in-out infinite}
 .cheer1{animation:cheer 1.3s ease-in-out infinite;animation-delay:-.5s}
 .cheer2{animation:cheer 1.9s ease-in-out infinite;animation-delay:-1s}
@@ -183,9 +198,9 @@ export function estate(a: WorldArgs): Layer {
   const m3 = mist(885, 60, 16, 'mi3', 4)
   const css = `${COMMON(t)}
 .moon-halo{animation:glow 11s ease-in-out infinite}
-.moon-pale{fill:${t.glow2};opacity:.8}
+.moon-pale{fill:${ld('#FFFFFF', '#E6EDFF')};opacity:.9}
 .lamp-glow{fill:url(#g-lamp);animation:glow 5s ease-in-out infinite}
-.gate{fill:#03050A;stroke:${t.rim};stroke-width:1.4;fill-rule:evenodd}
+.gate{fill:${ld('#1B2347', '#03050A')};stroke:${t.rim};stroke-width:1.4;fill-rule:evenodd}
 .search{fill:url(#g-ray);transform-origin:1230px 330px;animation:sweep 16s ease-in-out infinite}
 .search2{animation-duration:22s;animation-delay:-8s}
 @keyframes sweep{0%,100%{transform:rotate(-30deg);opacity:.4}50%{transform:rotate(30deg);opacity:.8}}
@@ -196,7 +211,7 @@ ${m.css}`
 ${place(ART.moon, { x: 250, y: 200, s: 0.8, cls: 'moon-pale', anchor: 'center' })}
 <ellipse class="cloud" cx="760" cy="300" rx="280" ry="14"/>
 <g transform="translate(800,900) scale(0.95,0.8)"><path class="far" d="${ART.mountain.d}" transform="translate(-850,-621)"/></g>
-<rect x="0" y="886" width="1600" height="14" fill="#05070C"/>
+<rect class="gstrip" x="0" y="886" width="1600" height="14"/>
 <polygon class="search" points="1222,330 1238,330 1560,-60 1260,-120"/>
 <polygon class="search search2" points="1222,330 1238,330 1000,-60 760,-100"/>
 <ellipse class="lamp-glow" cx="1230" cy="690" rx="320" ry="280"/>
@@ -210,3 +225,21 @@ ${m3.out}`
 }
 
 export const WORLD: Record<Mode, (a: WorldArgs) => Layer> = { godspeed, arena, estate }
+
+
+// The tone as one CSS value per color that is the day color in light mode and the night
+// color in dark mode, plus both plain tones for the few places that need one of them.
+export function modeTone(mode: Mode, accent: string) {
+  const dark = tintTone(TONE[mode], accent)
+  const light = tintTone(TONE_LIGHT[mode], mix(accent, '#1A2452', 0.5))
+  const tone: Tone = {
+    sky: [ld(light.sky[0], dark.sky[0]), ld(light.sky[1], dark.sky[1]), ld(light.sky[2], dark.sky[2])],
+    glow: ld(light.glow, dark.glow),
+    glow2: ld(light.glow2, dark.glow2),
+    eye: ld(light.eye, dark.eye),
+    rim: ld(light.rim, dark.rim),
+    ink: ld(light.ink, dark.ink),
+  }
+
+  return { tone, dark, light }
+}

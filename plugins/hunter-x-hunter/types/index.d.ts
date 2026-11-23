@@ -1,6 +1,7 @@
 export type Phase = 'idle' | 'thinking' | 'generating' | 'tools' | 'done' | 'error' | 'waiting' | 'compacting'
 export type Mode = 'godspeed' | 'arena' | 'estate'
 export type Who = 'killua' | 'gon' | 'kurapika' | 'leorio'
+export type Scheme = 'auto' | 'light' | 'dark'
 export type ToolKind = 'shell' | 'edit' | 'read' | 'web' | 'agent' | 'mcp'
 export type Counts = {
   turns: number
@@ -19,6 +20,7 @@ declare module 'claude-code' {
       phase: Phase
       mode: Mode
       who: Who
+      scheme: Scheme
       pct: number
       counts: Shaped<Counts>
       tool: ToolKind

@@ -9,6 +9,14 @@ An anime-RPG look for the Claude desktop app, built from original silhouette art
 
 Each world has its own palette for the whole interface (surfaces, text, accent, git colors, code highlighting) and its own message box shape.
 
+## Light and dark
+Every world has a night look and a day look, and the app's own mode chooses between them: the interface palette, the message boxes and the backdrop all switch together.
+- **Godspeed / stormy day:** a black moon ringed in cyan under a night sky, or a white moon with bold electric-blue lightning across a pale overcast sky.
+- **Heavens Arena / golden afternoon:** a violet dusk with ember orange, or a lavender and peach afternoon with a clean gold sun.
+- **Zoldyck Estate / silver morning:** a slate night under a pale moon, or a pale silver morning mist with the gate in deep navy.
+
+`/hxh light` forces the day look, `/hxh dark` forces the night look, and `/hxh auto` follows the app again (the default). The character's color is deepened on light surfaces so it stays readable. The status band uses the app's own theme colors, so it reads in both modes.
+
 ## The character sets the look
 Choosing a character re-themes the whole app, not only the companion. The world is the scenery and base palette; the character supplies:
 - the interface accent and a secondary color (buttons, links, code keywords, focus),
@@ -49,18 +57,20 @@ Counts, the context percentage and the turn length shown in toasts come from the
 - `/hxh` shows the current world and character.
 - `/hxh <world>` switches the world (godspeed, arena, estate); `/hxh <character>` switches who you play as (killua, gon, kurapika, leorio). `who` and `world` can be written out: `/hxh who gon`. Both are remembered across sessions.
 - `/hxh status` prints the real event counts this session received.
+- `/hxh light|dark|auto` forces the day look, the night look, or follows the app.
 - `/hxh off` returns the app's own look; `/hxh on` brings the theme back.
 
 ## Install and rollback
 Install from a folder with `claude --plugin-dir <this folder>`, or from a marketplace that lists it. Rollback: `/hxh off`, uninstall, or delete the folder; your settings are never changed. A session has one theme at a time, so a theme mod loaded later replaces this look until you run `/hxh on` again.
 
 ## What works and what does not
-Works (tested): all three worlds on desktop and mobile, every character in every state, the commands, the real-event counters, toasts, the band on terminal and desktop, and text contrast (primary at least 9.2:1; muted about 4.3:1 or better against the brightest backdrop pixels; framed messages 15:1). The largest scene across every world, character, state and tool kind is under 115,000 of the 131,072 characters allowed.
+Works (tested): all three worlds on desktop and mobile, every character in every state, the commands, the real-event counters, toasts, the band on terminal and desktop, and text contrast in both modes (primary at least 8.5:1 and muted at least 4.7:1 against the worst backdrop pixels, measured for each world; framed messages higher). The largest scene across every world, character, state and tool kind is under 115,000 of the 131,072 characters allowed.
 
 Not supported or not done:
 - The terminal and editors draw no theme or backdrop, only the band.
 - No sound.
 - Scene changes redraw the scene, so the animation restarts on each state change; there is no cross-fade.
+- The light look relies on the CSS `light-dark()` function in the backdrop; an app version too old to support it draws the night colors.
 - The companion sits in the left margin and is cropped on narrow windows.
 - A permission wait ends when the tool finishes, because the engine has no separate event for the moment of approval.
 - Party members come from the subagent start and stop events; at most one silhouette per other character is drawn (so three), while the band counts every running subagent. If the engine does not fire those events in some mode, nobody arrives.
